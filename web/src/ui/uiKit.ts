@@ -134,3 +134,67 @@ export function createScanlineOverlay(
   }
   return g;
 }
+
+/**
+ * Proximity highlight for interactables (NPCs, doors): a white outer glow
+ * on the sprite (postFX — WebGL only, silently absent on canvas) plus a
+ * bouncing "[E]" prompt floating above it, so the player understands E will
+ * act on this object.
+ *
+ * Returns a controller with set(on) — idempotent — and destroy(). The prompt
+ * text object lives in the sprite's scene and is destroyed with the scene on
+ * zone change; destroy() exists for explicit early cleanup.
+ */
+export function createInteractHighlight(
+  scene: Phaser.Scene,
+  sprite: Phaser.GameObjects.Sprite,
+  promptOffsetY = -12, // above the sprite's top edge; pass more when a label already sits there
+): { set(on: boolean): void; destroy(): void } {
+  let active = false;
+  let prompt: Phaser.GameObjects.Text | null = null;
+  let glow: Phaser.FX.Glow | null = null;
+
+  return {
+    set(on: boolean): void {
+      if (on === active) return;
+      active = on;
+
+      if (on) {
+        // Soft white outer glow reads as a pixel outline at low strength.
+        glow = sprite.postFX?.addGlow(0xffffff, 3, 0) ?? null;
+        if (!prompt) {
+          prompt = scene.add
+            .text(sprite.x, sprite.y - sprite.displayHeight / 2 + promptOffsetY, '[E]', {
+              fontFamily: 'monospace',
+              fontSize: '15px',
+              fontStyle: 'bold',
+              color: '#0b1420',
+              backgroundColor: '#e8f6ee',
+              padding: { x: 5, y: 2 },
+            })
+            .setOrigin(0.5, 1)
+            .setDepth(8500); // above entities/props, below the ambient tint FX
+          scene.tweens.add({
+            targets: prompt,
+            y: prompt.y - 6,
+            duration: 400,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
+        }
+        prompt.setVisible(true);
+      } else {
+        if (glow) {
+          sprite.postFX?.remove(glow);
+          glow = null;
+        }
+        prompt?.setVisible(false);
+      }
+    },
+    destroy(): void {
+      prompt?.destroy();
+      prompt = null;
+    },
+  };
+}

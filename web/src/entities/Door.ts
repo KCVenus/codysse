@@ -5,6 +5,7 @@ import { ContentLoader } from '@/systems/ContentLoader';
 import { GameEvents } from '@/systems/GameEvents';
 import { InputLock } from '@/systems/InputLock';
 import { COLORS } from '@/ui/theme';
+import { createInteractHighlight } from '@/ui/uiKit';
 
 /**
  * Door entity — interactable zone exit point.
@@ -34,6 +35,9 @@ export class Door extends Phaser.GameObjects.Sprite implements Interactable {
 
   private readonly doorData: DoorData;
   private readonly gameScene: Phaser.Scene;
+
+  /** Proximity outline + [E] prompt, driven by InteractionSystem. */
+  private highlight: ReturnType<typeof createInteractHighlight>;
 
   /**
    * @param scene    - Parent scene (ZoneScene)
@@ -65,6 +69,9 @@ export class Door extends Phaser.GameObjects.Sprite implements Interactable {
         color: '#cccccc',
       }
     ).setOrigin(0.5, 1).setDepth(doorData.position.y + this.displayHeight / 2);
+
+    // Proximity feedback — offset above the exit label so they don't overlap.
+    this.highlight = createInteractHighlight(scene, this, -34);
 
     // Subscribe to all-helped event to unlock and turn green.
     // Note: ZoneScene._unbindEvents() removes ALL_NPCS_HELPED listeners on zone
@@ -98,6 +105,11 @@ export class Door extends Phaser.GameObjects.Sprite implements Interactable {
     // not the door) — but we use DIALOGUE_ADVANCE for that, so we return false
     // here while the message is shown to avoid retriggering.
     return !InputLock.isLocked();
+  }
+
+  /** Proximity feedback (Interactable) — outline + [E] prompt on/off. */
+  setHighlighted(on: boolean): void {
+    this.highlight.set(on);
   }
 
   /**
