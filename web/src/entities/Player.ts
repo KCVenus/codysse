@@ -22,8 +22,12 @@ import Phaser from 'phaser';
  * the character moonwalk.)
  */
 export class Player extends Phaser.Physics.Arcade.Sprite {
-  /** Pixel/s movement speed — calibrated to Unity's speed=5 feel at ×5 scale. */
-  static readonly SPEED = 180;
+  /**
+   * Pixel/s movement speed. Originally 180 (calibrated to Unity's speed=5
+   * feel at ×5 scale) — raised to 240 after playtest: crossing a zone felt
+   * sluggish.
+   */
+  static readonly SPEED = 240;
 
   /** Sprite display scale — pixel-art ×5 (02-assets.md §Animations Phaser). */
   static readonly SCALE = 5;

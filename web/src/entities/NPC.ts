@@ -4,6 +4,7 @@ import type { NpcData } from '@/types/NpcData';
 import type { CardData } from '@/types/CardData';
 import { GameEvents } from '@/systems/GameEvents';
 import { InputLock } from '@/systems/InputLock';
+import { createInteractHighlight } from '@/ui/uiKit';
 
 /**
  * NPC state machine values.
@@ -58,6 +59,9 @@ export class NPC extends Phaser.GameObjects.Sprite implements Interactable {
 
   private readonly gameScene: Phaser.Scene;
 
+  /** Proximity outline + [E] prompt, driven by InteractionSystem. */
+  private highlight: ReturnType<typeof createInteractHighlight>;
+
   /**
    * @param scene      - Parent scene that owns this NPC (ZoneScene)
    * @param npcContent - NPC content data loaded from npcs.json
@@ -96,6 +100,9 @@ export class NPC extends Phaser.GameObjects.Sprite implements Interactable {
       fontSize: '14px',
       color: '#ffffaa',
     }).setOrigin(0.5, 1).setDepth(npcContent.position.y + this.displayHeight / 2);
+
+    // Proximity feedback — offset above the name label so they don't overlap.
+    this.highlight = createInteractHighlight(scene, this, -34);
 
     // Listen for deck picks on the global bus — filter to our npcId
     scene.game.events.on(
@@ -155,6 +162,11 @@ export class NPC extends Phaser.GameObjects.Sprite implements Interactable {
    */
   canInteract(): boolean {
     return this.npcState === 'Idle' && !InputLock.isLocked();
+  }
+
+  /** Proximity feedback (Interactable) — outline + [E] prompt on/off. */
+  setHighlighted(on: boolean): void {
+    this.highlight.set(on);
   }
 
   /**
