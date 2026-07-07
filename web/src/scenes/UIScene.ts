@@ -54,6 +54,18 @@ export class UIScene extends Phaser.Scene {
     const { width, height } = this.scale;
     createScanlineOverlay(this, width, height).setDepth(SCANLINE_DEPTH);
 
+    // Persistent controls hint, bottom-left — the game had no way to discover
+    // the Escape-to-menu exit (or T/M) without reading the code.
+    this.add
+      .text(12, height - 10, ContentLoader.getInstance().getString('hud.controls'), {
+        fontFamily: 'monospace',
+        fontSize: '13px',
+        color: '#9fb8a8',
+      })
+      .setOrigin(0, 1)
+      .setAlpha(0.75)
+      .setDepth(SCANLINE_DEPTH - 1);
+
     this._bindEvents();
   }
 

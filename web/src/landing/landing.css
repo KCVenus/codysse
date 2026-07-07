@@ -133,6 +133,9 @@ a {
 .hero__stars {
   position: absolute;
   inset: 0;
+  /* Decorative layer painted over the hero content in DOM order — without
+     this it swallows clicks on the JOUER button underneath. */
+  pointer-events: none;
   background-image:
     radial-gradient(1px 1px at 20px 30px, #fff, transparent),
     radial-gradient(1px 1px at 130px 90px, #9fd, transparent),
