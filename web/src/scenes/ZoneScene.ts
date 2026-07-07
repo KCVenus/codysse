@@ -386,13 +386,29 @@ export class ZoneScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   /**
-   * Returns all cards from the content database.
-   * NPC calls this when opening DeckPanel — Unity DeckUI shows all cards, not just deck.
+   * Returns the cards available as answers in this zone.
    *
-   * @returns Full card catalog from ContentLoader
+   * Progressive pool: the union of `cardPool` over all zones up to and
+   * including the current one (zone index order = progression order), so the
+   * player starts with a handful of languages and unlocks more toward the
+   * final zone instead of seeing all 19 cards from the start.
+   *
+   * Falls back to the full catalog when any zone in range predates the
+   * `cardPool` schema — the game must never become unanswerable.
+   *
+   * @returns Cards NPC passes to DeckPanel when asking a question
    */
   getAllCards(): CardData[] {
-    return ContentLoader.getInstance().getCards();
+    const cl = ContentLoader.getInstance();
+    const all = cl.getCards();
+
+    const zones = cl.getZones();
+    const idx = zones.findIndex((z) => z.id === this.zoneData.id);
+    const unlocked = idx >= 0 ? zones.slice(0, idx + 1) : zones;
+    if (unlocked.some((z) => !z.cardPool)) return all;
+
+    const ids = new Set(unlocked.flatMap((z) => z.cardPool!));
+    return all.filter((c) => ids.has(c.id));
   }
 
   /**

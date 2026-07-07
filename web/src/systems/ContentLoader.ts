@@ -337,10 +337,10 @@ export class ContentLoader {
   }
 
   /**
-   * Returns the ids of all cards that are NOT expected answers for any NPC.
-   *
-   * This is the initial player deck (complement set), matching the Unity
-   * GameManager.Start logic: deck = all cards minus expectedAnswer cards.
+   * Returns the initial player deck: cards that are NOT expected answers for
+   * any NPC (matching the Unity GameManager.Start complement-set logic),
+   * restricted to the first zone's `cardPool` when one is authored — so a
+   * fresh save doesn't start owning late-game languages (progressive unlock).
    * See gdd/01-boucle-reference.md §Deck & cartes.
    */
   getInitialDeckCards(): CardData[] {
@@ -351,7 +351,11 @@ export class ContentLoader {
         answerIds.add(npc.question.expectedCardId);
       }
     }
-    return store.cards.filter((c) => !answerIds.has(c.id));
+    const firstPool = store.zones.get(store.zoneOrder[0])?.cardPool;
+    const base = firstPool
+      ? store.cards.filter((c) => firstPool.includes(c.id))
+      : store.cards;
+    return base.filter((c) => !answerIds.has(c.id));
   }
 
   // -------------------------------------------------------------------------

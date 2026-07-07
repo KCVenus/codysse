@@ -3054,5 +3054,12 @@
       }
     ]
   },
-  "music": "music.zone_01"
+  "music": "music.zone_01",
+  "cardPool": [
+    "javascript",
+    "csharp",
+    "sql",
+    "html",
+    "python"
+  ]
 }
