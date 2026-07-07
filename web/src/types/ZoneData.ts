@@ -158,6 +158,13 @@ export interface ZoneData {
   theme?: ZoneTheme;
 
   /**
+   * Optional music track for this zone — a manifest key from
+   * content/audio.json (e.g. "music.zone_01"). When absent, whatever track is
+   * already playing keeps playing (no hard stop on zone entry).
+   */
+  music?: string;
+
+  /**
    * Optional tilemap data (phase 2). Absent on zones authored before this
    * schema landed — ZoneScene falls back to the placeholder checkerboard
    * floor in that case (content and engine work lands in parallel).

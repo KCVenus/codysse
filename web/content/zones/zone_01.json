@@ -1,6 +1,6 @@
 {
   "id": "zone_01",
-  "displayName": "Zone 1 — Les pionniers du web",
+  "displayName": "Zone 1 \u2014 Les pionniers du web",
   "tilemap": "zone_01.json",
   "spawn": {
     "x": 183,
@@ -3053,5 +3053,6 @@
         "solid": true
       }
     ]
-  }
+  },
+  "music": "music.zone_01"
 }

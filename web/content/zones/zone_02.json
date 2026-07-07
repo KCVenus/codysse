@@ -1,6 +1,6 @@
 {
   "id": "zone_02",
-  "displayName": "Zone 2 — Les fondations (1950s–1970s)",
+  "displayName": "Zone 2 \u2014 Les fondations (1950s\u20131970s)",
   "tilemap": "zone_02.json",
   "spawn": {
     "x": 106,
@@ -3075,5 +3075,6 @@
         "solid": true
       }
     ]
-  }
+  },
+  "music": "music.zone_02"
 }

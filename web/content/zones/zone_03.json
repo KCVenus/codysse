@@ -1,6 +1,6 @@
 {
   "id": "zone_03",
-  "displayName": "Zone 3 — L'ère des systèmes (1980s)",
+  "displayName": "Zone 3 \u2014 L'\u00e8re des syst\u00e8mes (1980s)",
   "tilemap": "zone_03.json",
   "spawn": {
     "x": 116,
@@ -3042,5 +3042,6 @@
         "solid": true
       }
     ]
-  }
+  },
+  "music": "music.zone_03"
 }
