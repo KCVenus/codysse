@@ -109,6 +109,12 @@ export class ZoneScene extends Phaser.Scene {
   /** Whether T was down last frame (single-press guard). */
   private wasTDown = false;
 
+  /** Escape key — exit to main menu (single-press guard). */
+  private escKey!: Phaser.Input.Keyboard.Key;
+
+  /** Whether Escape was down last frame (single-press guard). */
+  private wasEscDown = false;
+
   /** Whether the timeline frieze is currently open (to avoid double-toggle). */
   private timelineOpen = false;
 
@@ -145,6 +151,7 @@ export class ZoneScene extends Phaser.Scene {
     this.wasEDown = false;
     this.wasMDown = false;
     this.wasTDown = false;
+    this.wasEscDown = false;
     this.timelineOpen = false;
     // `player`, `interaction`, `deck`, `progression`, `cursors`, `wasd`,
     // `eKey`, `mKey`, `zoneData` are all reassigned unconditionally below —
@@ -210,6 +217,9 @@ export class ZoneScene extends Phaser.Scene {
 
     // T key — timeline frieze toggle (TASK-023)
     this.tKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.T);
+
+    // Escape — exit to main menu (progress is saved continuously, safe anytime)
+    this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
     // ---- Player ----
     const spawn = this.zoneData.spawn;
@@ -357,6 +367,17 @@ export class ZoneScene extends Phaser.Scene {
       }
     }
 
+    // Escape: exit to main menu (single-press — rising edge only).
+    // Only when no overlay holds the lock (dialogue/deck/timeline manage
+    // their own dismissal) — Escape must never yank the player out mid-answer.
+    const escDown = this.escKey.isDown;
+    const escJustPressed = escDown && !this.wasEscDown;
+    this.wasEscDown = escDown;
+    if (escJustPressed && !InputLock.isLocked() && !this.timelineOpen) {
+      this._exitToMenu();
+      return;
+    }
+
     // InteractionSystem handles E for NPCs and doors (unlocked state only).
     // Returns true if it triggered an interaction this frame — used below to
     // prevent the same E press from being consumed twice (single-press guarantee).
@@ -438,6 +459,28 @@ export class ZoneScene extends Phaser.Scene {
    *
    * @param nextZoneId - Zone to transition to, or undefined for final zone
    */
+  /**
+   * Exit the zone back to the main menu (Escape key).
+   *
+   * Progress needs no explicit save here — deck, helped NPCs and current zone
+   * are persisted as they change. Stops the parallel overlay scenes
+   * (UIScene/TimelineScene) so the menu owns the screen; MainMenuScene
+   * relaunches them on the next play. Reuses the door-transition fade +
+   * `transitioning` guard so Escape can't double-fire or race a door exit.
+   */
+  private _exitToMenu(): void {
+    if (this.transitioning) return;
+    this.transitioning = true;
+
+    this.cameras.main.fadeOut(300, 0, 0, 0);
+    this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => {
+      this._unbindEvents();
+      this.scene.stop('UIScene');
+      this.scene.stop('TimelineScene');
+      this.scene.start('MainMenuScene');
+    });
+  }
+
   private _triggerZoneTransition(nextZoneId: string | undefined): void {
     if (this.transitioning) return;
     this.transitioning = true;

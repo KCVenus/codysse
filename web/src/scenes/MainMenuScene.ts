@@ -116,11 +116,10 @@ export class MainMenuScene extends Phaser.Scene {
       }
     }, 16);
 
-    // Quitter button — on web, returns to main menu (ADR-004; no Application.Quit)
-    // Shown for parity with Unity but effectively a no-op from this scene.
+    // Quitter button — on web the closest thing to quitting is leaving the
+    // game page: go back to the landing at / (ADR-004; no Application.Quit).
     createPixelButton(this, width / 2, height * 0.70, 280, 56, cl.getString('menu.quit'), () => {
-      // Reload the page on web as the closest equivalent to quitting
-      window.location.reload();
+      window.location.href = '/';
     }, 16);
   }
 }
