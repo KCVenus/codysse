@@ -11,59 +11,29 @@ import { InputLock } from '@/systems/InputLock';
 import { GameEvents } from '@/systems/GameEvents';
 import { AudioManager } from '@/systems/AudioManager';
 import type { CardData } from '@/types/CardData';
-import type { ZoneData } from '@/types/ZoneData';
+import type { ZoneData, ZoneTheme, ZoneProp } from '@/types/ZoneData';
 
 /**
- * Per-era background tint palette.
+ * Default zone theme, used when a zone JSON predates the `theme` schema
+ * (phase 2 art overhaul). Matches the deep-space codysse.fr identity
+ * (src/ui/theme.ts) so untouched zones still look coherent.
  *
- * Data-driven: map themeEra → camera background hex. If an era is not listed
- * here the hash fallback produces a deterministic colour from the string.
- * Real tilemaps (J5) will replace this with actual Tiled JSON — this is a
- * visual placeholder only.
+ * Replaces the old ERA_BACKGROUND/ERA_TILE_SHADES engine-hardcoded dicts —
+ * colours are now authored per zone in content/zones/zone_0X.json.
  */
-const ERA_BACKGROUND: Record<string, string> = {
-  '1950s': '#1a1a0a', // dark olive — vacuum tubes, early mainframes
-  '1960s': '#0a1a1a', // dark teal — Fortran, COBOL era
-  '1970s': '#1a0a1a', // dark purple — C, Unix era
-  '1980s': '#1a1a0a', // dark amber — PC revolution, Pascal
-  '1990s': '#1a2a1a', // dark green — web dawn, Java, Python
-  '2000s': '#0a1a2a', // dark blue — broadband, frameworks
-  '2010s': '#2a1a0a', // dark orange — mobile, JS explosion
-  '2020s': '#0a2a1a', // dark emerald — Rust, WASM, cloud-native
+const DEFAULT_THEME: ZoneTheme = {
+  background: '#0b1420',
+  ambient: '#102030',
+  ambientAlpha: 0.22,
+  accent: '#3dfc8e',
 };
 
 /**
- * Per-era checkerboard tint colours (light shade, dark shade) for the
- * placeholder floor tiles. Each era gets a distinct colour pair so zones
- * look visually different before real tilemaps arrive in J5.
+ * Normalise a theme hex string to always include the leading '#' — authors
+ * may write either "0b1420" or "#0b1420" (see ZoneTheme doc comment).
  */
-const ERA_TILE_SHADES: Record<string, [number, number]> = {
-  '1950s': [0x5a4a1b, 0x4a3a14],
-  '1960s': [0x1b4a4a, 0x143a3a],
-  '1970s': [0x4a1b4a, 0x3a143a],
-  '1980s': [0x5a4a1b, 0x4a3a14],
-  '1990s': [0x2d5a1b, 0x264d17],
-  '2000s': [0x1b2d5a, 0x17264d],
-  '2010s': [0x5a2d1b, 0x4d2617],
-  '2020s': [0x1b5a2d, 0x174d26],
-};
-
-/**
- * Fallback: hash a string into a valid hex colour string for unlisted eras.
- * Produces a dark colour (bits 0–5 of each channel clamped to [0x10, 0x2a]).
- *
- * @param s - Source string (themeEra value)
- * @returns CSS hex colour string like '#1a0f22'
- */
-function _hashEraColour(s: string): string {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  }
-  const r = 0x10 + (Math.abs(h) % 0x1a);
-  const g = 0x10 + (Math.abs(h >> 8) % 0x1a);
-  const b = 0x10 + (Math.abs(h >> 16) % 0x1a);
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+function _normalizeHex(hex: string): string {
+  return hex.startsWith('#') ? hex : `#${hex}`;
 }
 
 /**
@@ -105,6 +75,9 @@ export class ZoneScene extends Phaser.Scene {
   private player!: Player;
   private npcs: NPC[] = [];
   private doors: Door[] = [];
+
+  /** Walls tilemap layer (collidable), when the active zone has `map` data. */
+  private wallsLayer?: Phaser.Tilemaps.TilemapLayer;
 
   // ---- Systems ----
   private interaction!: InteractionSystem;
@@ -167,6 +140,7 @@ export class ZoneScene extends Phaser.Scene {
     // objects in the InputLock advance loop and cause errors.
     this.npcs = [];
     this.doors = [];
+    this.wallsLayer = undefined;
     this.transitioning = false;
     this.wasEDown = false;
     this.wasMDown = false;
@@ -209,12 +183,9 @@ export class ZoneScene extends Phaser.Scene {
     // Reset transition guard each time the scene starts
     this.transitioning = false;
 
-    const { width, height } = this.scale;
-
-    // ---- Background (themeEra-driven) ----
-    const bgColour = ERA_BACKGROUND[this.zoneData.themeEra] ?? _hashEraColour(this.zoneData.themeEra);
-    this.cameras.main.setBackgroundColor(bgColour);
-    this._drawPlaceholderMap(width, height, this.zoneData.themeEra);
+    // ---- Theme (phase 2) ----
+    // Falls back to DEFAULT_THEME when the zone JSON predates the `theme` schema.
+    this._applyTheme(this.zoneData.theme ?? DEFAULT_THEME);
 
     // ---- Input ----
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -236,10 +207,14 @@ export class ZoneScene extends Phaser.Scene {
     const spawn = this.zoneData.spawn;
     this.player = new Player(this, spawn.x, spawn.y);
 
+    // ---- Map (tilemap layers + props if `map` data present, else placeholder floor) ----
+    // Built after the player exists so solid props/walls can collide with it immediately.
+    const { worldWidth, worldHeight } = this._buildMap(this.zoneData);
+
     // ---- Camera ----
     // Follow player with lerp ≈ 0.15 (matches Unity CameraFollow smoothTime=0.15)
     this.cameras.main.startFollow(this.player, true, 0.15, 0.15);
-    this.cameras.main.setBounds(0, 0, width * 2, height * 2);
+    this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
 
     // ---- Systems ----
     this.interaction = new InteractionSystem(this);
@@ -327,7 +302,12 @@ export class ZoneScene extends Phaser.Scene {
     this._bindEvents();
 
     // ---- Physics world bounds ----
-    this.physics.world.setBounds(0, 0, width * 2, height * 2);
+    this.physics.world.setBounds(0, 0, worldWidth, worldHeight);
+
+    // ---- Player ↔ walls collision (only when the zone has tilemap data) ----
+    if (this.wallsLayer) {
+      this.physics.add.collider(this.player, this.wallsLayer);
+    }
 
     // Make sure InputLock starts clean (in case UIScene leaked a lock from prev run)
     InputLock.unlock();
@@ -405,6 +385,16 @@ export class ZoneScene extends Phaser.Scene {
    */
   getAllCards(): CardData[] {
     return ContentLoader.getInstance().getCards();
+  }
+
+  /**
+   * Returns the player's current world position.
+   * NPC calls this to compute which idle frame to face when dialogue starts.
+   *
+   * @returns Player's {x, y} in world space
+   */
+  getPlayerPosition(): { x: number; y: number } {
+    return { x: this.player.x, y: this.player.y };
   }
 
   // ---------------------------------------------------------------------------
@@ -567,34 +557,131 @@ export class ZoneScene extends Phaser.Scene {
   // ---------------------------------------------------------------------------
 
   /**
-   * Draw a tiled placeholder background using era-specific colours.
+   * Apply the zone's visual theme: camera background colour and an optional
+   * full-screen ambient tint rectangle.
    *
-   * In J1–J4, no Tiled JSON tilemap is loaded — this gives a visual floor
-   * that differs per era so zones feel distinct.
-   * Agent-infra/contenu can replace this with a proper TilemapJSONFile loader
-   * in J5 without changing anything else.
+   * Replaces the old ERA_BACKGROUND/ERA_TILE_SHADES engine-hardcoded dicts —
+   * `theme` is authored per zone in content/zones/zone_0X.json, with
+   * DEFAULT_THEME as the fallback for zones that predate this schema.
+   *
+   * @param theme - Zone theme (or DEFAULT_THEME fallback)
+   */
+  private _applyTheme(theme: ZoneTheme): void {
+    this.cameras.main.setBackgroundColor(_normalizeHex(theme.background));
+
+    if (theme.ambient) {
+      const { width, height } = this.scale;
+      const ambientColour = Phaser.Display.Color.HexStringToColor(_normalizeHex(theme.ambient)).color;
+      const ambientRect = this.add.rectangle(width / 2, height / 2, width, height, ambientColour, theme.ambientAlpha ?? 0.2);
+      // Screen-fixed (not world-space) — an atmospheric overlay that follows the camera.
+      // Depth above tiles/props/entities (all negative-to-mid depths), below UI (separate scene).
+      ambientRect.setScrollFactor(0);
+      ambientRect.setDepth(9000);
+    }
+  }
+
+  /**
+   * Build the zone's tilemap layers (ground/walls/decor) and props from
+   * `zone.map`, or fall back to the era-hashed placeholder checkerboard when
+   * the zone predates the `map` schema (content and engine work land in
+   * parallel — this keeps ZoneScene working with either).
+   *
+   * Layer render order (back to front): ground < walls < decor < entities
+   * (entities y-sort via depth = feet Y, always a much larger positive value).
+   *
+   * @param zone - Active zone data
+   * @returns World pixel dimensions to use for camera/physics bounds
+   */
+  private _buildMap(zone: ZoneData): { worldWidth: number; worldHeight: number } {
+    const map = zone.map;
+
+    if (!map) {
+      const { width, height } = this.scale;
+      this._drawPlaceholderMap(width, height, zone.themeEra);
+      return { worldWidth: width * 2, worldHeight: height * 2 };
+    }
+
+    const makeLayer = (data: number[][], depth: number, collides: boolean): Phaser.Tilemaps.TilemapLayer => {
+      const tilemap = this.make.tilemap({ data, tileWidth: map.tileSize, tileHeight: map.tileSize });
+      const tileset = tilemap.addTilesetImage('tiles', 'tiles', map.tileSize, map.tileSize)!;
+      const layer = tilemap.createLayer(0, tileset, 0, 0)!;
+      layer.setScale(map.tileScale).setDepth(depth);
+      if (collides) {
+        layer.setCollisionByExclusion([-1]);
+      }
+      return layer;
+    };
+
+    // ground renders below everything, never collides.
+    makeLayer(map.ground, -30, false);
+    // walls collide with the player; stored for the collider added once the player exists.
+    this.wallsLayer = makeLayer(map.walls, -20, true);
+    // decor renders above ground, below entities, never collides.
+    makeLayer(map.decor, -10, false);
+
+    for (const prop of map.props) {
+      // Props share the tileset's native pixel density → same display scale.
+      this._spawnProp(prop, map.tileScale);
+    }
+
+    return {
+      worldWidth: map.width * map.tileSize * map.tileScale,
+      worldHeight: map.height * map.tileSize * map.tileScale,
+    };
+  }
+
+  /**
+   * Spawn one prop from `zone.map.props`: registers a custom texture frame
+   * for its source rect in the props atlas, places it at ×2 display scale,
+   * y-sorts it like an entity (depth = feet Y), and gives it a static
+   * physics body + player collider when `solid` is true.
+   *
+   * @param prop  - Prop placement data (source rect + world position + solid flag)
+   * @param scale - Display scale (map.tileScale — props share the tileset pixel density)
+   */
+  private _spawnProp(prop: ZoneProp, scale: number): void {
+    const [rx, ry, rw, rh] = prop.rect;
+    const frameName = `prop_${rx}_${ry}_${rw}_${rh}`;
+
+    const propsTexture = this.textures.get('props_atlas');
+    if (!propsTexture.has(frameName)) {
+      propsTexture.add(frameName, 0, rx, ry, rw, rh);
+    }
+
+    const img = this.add.image(prop.x, prop.y, 'props_atlas', frameName);
+    img.setScale(scale);
+    // y-sort like entities: depth = feet Y (origin is centre, so bottom edge = y + half display height).
+    img.setDepth(prop.y + img.displayHeight / 2);
+
+    if (prop.solid) {
+      this.physics.add.existing(img, true);
+      this.physics.add.collider(this.player, img);
+    }
+  }
+
+  /**
+   * Draw a tiled placeholder background using era-hashed colours.
+   *
+   * Fallback ONLY for zones that predate the `map` schema (phase 2). Once
+   * every zone JSON has `map` data this path becomes dead code but is kept
+   * so content and engine work can land independently without breaking
+   * older zone files.
    *
    * @param width   - Scene display width
    * @param height  - Scene display height
-   * @param themeEra - Zone's era string (used to pick the checkerboard colours)
+   * @param seed    - String used to derive deterministic checkerboard shades (zone's themeEra)
    */
-  private _drawPlaceholderMap(width: number, height: number, themeEra: string): void {
+  private _drawPlaceholderMap(width: number, height: number, seed: string): void {
     const mapW = width * 2;
     const mapH = height * 2;
     const tileSize = 32;
 
-    // Pick era-specific tile shades; fall back to a hash-derived pair.
-    let [shade0, shade1] = ERA_TILE_SHADES[themeEra] ?? [0x2d5a1b, 0x264d17];
-
-    // If era not in the table, derive two shades from the colour hash
-    if (!ERA_TILE_SHADES[themeEra]) {
-      let h = 0;
-      for (let i = 0; i < themeEra.length; i++) {
-        h = (Math.imul(31, h) + themeEra.charCodeAt(i)) | 0;
-      }
-      shade0 = 0x101010 + (Math.abs(h) % 0x1a1a1a);
-      shade1 = 0x0a0a0a + (Math.abs(h >> 4) % 0x141414);
+    let h = 0;
+    for (let i = 0; i < seed.length; i++) {
+      h = (Math.imul(31, h) + seed.charCodeAt(i)) | 0;
     }
+    const shade0 = 0x101010 + (Math.abs(h) % 0x1a1a1a);
+    const shade1 = 0x0a0a0a + (Math.abs(h >> 4) % 0x141414);
 
     for (let ty = 0; ty < mapH / tileSize; ty++) {
       for (let tx = 0; tx < mapW / tileSize; tx++) {
