@@ -3076,5 +3076,11 @@
       }
     ]
   },
-  "music": "music.zone_02"
+  "music": "music.zone_02",
+  "cardPool": [
+    "fortran",
+    "cobol",
+    "lisp",
+    "c"
+  ]
 }

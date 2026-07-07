@@ -3043,5 +3043,9 @@
       }
     ]
   },
-  "music": "music.zone_03"
+  "music": "music.zone_03",
+  "cardPool": [
+    "cpp",
+    "perl"
+  ]
 }

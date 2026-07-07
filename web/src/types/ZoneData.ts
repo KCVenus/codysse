@@ -165,6 +165,16 @@ export interface ZoneData {
   music?: string;
 
   /**
+   * Card ids this zone contributes to the answer pool. The pool shown when
+   * answering an NPC is CUMULATIVE: the union of cardPool over all zones up
+   * to and including the current one — old languages first, recent ones only
+   * near the end of the game. A zone's expected answers must appear in its
+   * own pool or an earlier zone's. When any zone in range omits this field,
+   * the engine falls back to the full catalog (pre-pool saves/content).
+   */
+  cardPool?: string[];
+
+  /**
    * Optional tilemap data (phase 2). Absent on zones authored before this
    * schema landed — ZoneScene falls back to the placeholder checkerboard
    * floor in that case (content and engine work lands in parallel).

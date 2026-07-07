@@ -3087,5 +3087,10 @@
       }
     ]
   },
-  "music": "music.zone_04"
+  "music": "music.zone_04",
+  "cardPool": [
+    "php",
+    "ruby",
+    "java"
+  ]
 }

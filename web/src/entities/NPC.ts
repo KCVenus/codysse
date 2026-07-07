@@ -217,7 +217,8 @@ export class NPC extends Phaser.GameObjects.Sprite implements Interactable {
   /**
    * Turn to face the player when dialogue starts, picking the idle frame
    * for the dominant axis of the direction from this NPC to the player
-   * (down=1, up=4, left=7, right=7+flipX — same frame layout as player.png).
+   * (down=1, up=4, right=7, left=7+flipX — same frame layout as player.png,
+   * whose side frames face right).
    *
    * Reads the player's position via a narrow structural cast on the parent
    * scene (ZoneScene.getPlayerPosition()) rather than importing ZoneScene
@@ -238,11 +239,11 @@ export class NPC extends Phaser.GameObjects.Sprite implements Interactable {
       this.setFlipX(false);
       this.setFrame(dy >= 0 ? 1 : 4); // player below → face down; above → face up
     } else if (dx > 0) {
-      this.setFlipX(true);
-      this.setFrame(7); // player to the right → left frame mirrored
-    } else {
       this.setFlipX(false);
-      this.setFrame(7); // player to the left → face left
+      this.setFrame(7); // player to the right → side frame faces right natively
+    } else {
+      this.setFlipX(true);
+      this.setFrame(7); // player to the left → mirror the right-facing frame
     }
   }
 

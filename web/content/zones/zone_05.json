@@ -3063,5 +3063,12 @@
       }
     ]
   },
-  "music": "music.zone_05"
+  "music": "music.zone_05",
+  "cardPool": [
+    "go",
+    "kotlin",
+    "typescript",
+    "rust",
+    "swift"
+  ]
 }
