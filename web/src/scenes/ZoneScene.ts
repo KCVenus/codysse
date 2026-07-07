@@ -180,6 +180,14 @@ export class ZoneScene extends Phaser.Scene {
     // ---- Record current zone in save (resume point for page reloads) ----
     save.recordZoneUnlocked(this.zoneData.id);
 
+    // ---- Zone music ----
+    // init() is idempotent — needed here for the direct-to-zone path (page
+    // reload resume) where MainMenuScene.create() may not have run yet.
+    AudioManager.getInstance().init(this);
+    if (this.zoneData.music) {
+      AudioManager.getInstance().playMusic(this.zoneData.music);
+    }
+
     // Reset transition guard each time the scene starts
     this.transitioning = false;
 

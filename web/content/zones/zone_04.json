@@ -1,6 +1,6 @@
 {
   "id": "zone_04",
-  "displayName": "Zone 4 — L'explosion du web (1990s–2000s)",
+  "displayName": "Zone 4 \u2014 L'explosion du web (1990s\u20132000s)",
   "tilemap": "zone_04.json",
   "spawn": {
     "x": 209,
@@ -3086,5 +3086,6 @@
         "solid": false
       }
     ]
-  }
+  },
+  "music": "music.zone_04"
 }

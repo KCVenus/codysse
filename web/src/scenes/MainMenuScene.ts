@@ -41,10 +41,10 @@ export class MainMenuScene extends Phaser.Scene {
     // Must happen after PreloadScene has loaded audio files into the cache.
     AudioManager.getInstance().init(this);
 
-    // Request ambient music. Because this runs in create() (not a user gesture),
+    // Request the menu theme. Because this runs in create() (not a user gesture),
     // the browser AudioContext may be suspended. AudioManager will defer the
     // actual play() until 'unlocked' fires on the first pointer/key event.
-    AudioManager.getInstance().startAmbient();
+    AudioManager.getInstance().playMusic('music.menu');
 
     this.cameras.main.setBackgroundColor(COLORS.bgCss);
 

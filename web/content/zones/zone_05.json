@@ -1,6 +1,6 @@
 {
   "id": "zone_05",
-  "displayName": "Zone 5 — L'ère moderne (2010s+)",
+  "displayName": "Zone 5 \u2014 L'\u00e8re moderne (2010s+)",
   "tilemap": "zone_05.json",
   "spawn": {
     "x": 173,
@@ -3062,5 +3062,6 @@
         "solid": true
       }
     ]
-  }
+  },
+  "music": "music.zone_05"
 }
