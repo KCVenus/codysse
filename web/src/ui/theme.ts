@@ -33,6 +33,10 @@ export const COLORS = {
   /** Locked / error red. */
   red: 0xc8102e,
   redCss: '#c8102e',
+  /** Pixel-button shadow (idle) — mirrors landing `.btn-play` box-shadow colour. */
+  shadowGreen: 0x14532d,
+  /** Pixel-button shadow (hover) — mirrors landing `.btn-play:hover` box-shadow colour. */
+  shadowAmber: 0x7c4a03,
 } as const;
 
 export const FONTS = {

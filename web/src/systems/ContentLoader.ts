@@ -155,6 +155,28 @@ function validateZone(zone: unknown, npcIds: Set<string>): void {
       );
     }
   }
+
+  // --- Phase 2 fields: `map` and `theme` are both optional and validated
+  // permissively (shape-only) so content authoring can land independently of
+  // this schema without breaking older zone files that predate it.
+  if (z['theme'] !== undefined && z['theme'] !== null) {
+    const theme = z['theme'] as Record<string, unknown>;
+    assertString(theme['background'], `zone "${z['id']}".theme.background`);
+  }
+
+  if (z['map'] !== undefined && z['map'] !== null) {
+    const map = z['map'] as Record<string, unknown>;
+    if (typeof map['tileSize'] !== 'number' || typeof map['tileScale'] !== 'number') {
+      throw new Error(`ContentLoader: zone "${z['id']}".map.tileSize/tileScale must be numbers`);
+    }
+    if (typeof map['width'] !== 'number' || typeof map['height'] !== 'number') {
+      throw new Error(`ContentLoader: zone "${z['id']}".map.width/height must be numbers`);
+    }
+    assertArray(map['ground'], `zone "${z['id']}".map.ground`);
+    assertArray(map['walls'], `zone "${z['id']}".map.walls`);
+    assertArray(map['decor'], `zone "${z['id']}".map.decor`);
+    assertArray(map['props'], `zone "${z['id']}".map.props`);
+  }
 }
 
 // ---------------------------------------------------------------------------

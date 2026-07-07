@@ -7,6 +7,10 @@ import { ZoneBanner } from '@/ui/ZoneBanner';
 import { GameEvents } from '@/systems/GameEvents';
 import type { CardData } from '@/types/CardData';
 import { ContentLoader } from '@/systems/ContentLoader';
+import { createScanlineOverlay } from '@/ui/uiKit';
+
+/** Scanline overlay depth — above every other UIScene display object. */
+const SCANLINE_DEPTH = 10000;
 
 /**
  * UIScene — persistent overlay scene running on top of ZoneScene.
@@ -45,6 +49,11 @@ export class UIScene extends Phaser.Scene {
     this.narrativeOverlay = new NarrativeOverlay(this);
     this.zoneBanner = new ZoneBanner(this);
 
+    // Subtle CRT scanlines on top of every UI layer — purely decorative,
+    // non-interactive (Graphics has no input unless setInteractive is called).
+    const { width, height } = this.scale;
+    createScanlineOverlay(this, width, height).setDepth(SCANLINE_DEPTH);
+
     this._bindEvents();
   }
 
@@ -59,8 +68,8 @@ export class UIScene extends Phaser.Scene {
     // ---- Dialogue ----
 
     // Open dialogue box with given payload
-    ev.on(GameEvents.DIALOGUE_OPEN, (data: { speakerName: string; line: string; portrait?: string; hint?: string }) => {
-      this.dialogueBox.show(data.speakerName, data.line, data.portrait, data.hint ?? cl.getString('dialogue.continue'));
+    ev.on(GameEvents.DIALOGUE_OPEN, (data: { speakerName: string; line: string; portrait?: string; hint?: string; npcId?: string }) => {
+      this.dialogueBox.show(data.speakerName, data.line, data.hint ?? cl.getString('dialogue.continue'), data.npcId);
     });
 
     // Close dialogue box (used by locked-door single-line messages after E press)
