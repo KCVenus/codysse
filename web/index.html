@@ -15,6 +15,38 @@
     />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://codysse.fr/" />
+    <meta property="og:site_name" content="Codysse" />
+
+    <!--
+      Site name in Google results: the grey line above the title comes from
+      WebSite.name in this JSON-LD block. Google only reads it on the HOME PAGE
+      (this file — not /play/), and falls back to the bare domain ("codysse.fr")
+      when it is missing, which is exactly what we were getting. The name must
+      stay exactly "Codysse".
+      https://developers.google.com/search/docs/appearance/site-names
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://codysse.fr/#organization",
+            "name": "Codysse",
+            "url": "https://codysse.fr"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://codysse.fr/#website",
+            "name": "Codysse",
+            "url": "https://codysse.fr",
+            "publisher": { "@id": "https://codysse.fr/#organization" },
+            "inLanguage": "fr"
+          }
+        ]
+      }
+    </script>
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
