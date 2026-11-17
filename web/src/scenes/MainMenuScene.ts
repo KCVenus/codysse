@@ -78,7 +78,7 @@ export class MainMenuScene extends Phaser.Scene {
     const isNewGame = currentZoneId === null;
     const playLabel = isNewGame ? cl.getString('menu.play') : cl.getString('menu.continue');
 
-    createPixelButton(this, width / 2, height * 0.58, 280, 56, playLabel, () => {
+    createPixelButton(this, width / 2, height * 0.50, 280, 56, playLabel, () => {
       const startData = currentZoneId ? { zoneId: currentZoneId } : undefined;
 
       // Ensure UIScene and TimelineScene are running before emitting events.
@@ -116,10 +116,16 @@ export class MainMenuScene extends Phaser.Scene {
       }
     }, 16);
 
+    // Créer un niveau — level editor entry (J6). Resumes the auto-saved draft
+    // when one exists (EditorScene falls back to a fresh zone_01 clone otherwise).
+    createPixelButton(this, width / 2, height * 0.62, 280, 44, cl.getString('menu.create'), () => {
+      this.scene.start('EditorScene');
+    }, 12);
+
     // Quitter button — on web the closest thing to quitting is leaving the
     // game page: go back to the landing at / (ADR-004; no Application.Quit).
-    createPixelButton(this, width / 2, height * 0.70, 280, 56, cl.getString('menu.quit'), () => {
+    createPixelButton(this, width / 2, height * 0.74, 280, 44, cl.getString('menu.quit'), () => {
       window.location.href = '/';
-    }, 16);
+    }, 12);
   }
 }

@@ -293,6 +293,31 @@ export class ContentLoader {
   }
 
   /**
+   * Inject a runtime-authored zone into the in-memory zone list (level editor).
+   *
+   * Used by EditorScene (test play) and FanLevelsScene (imported fan levels):
+   * the zone is NOT on disk, so the normal fetch path cannot see it. Runtime
+   * zones are appended AFTER the authored ones in zoneOrder — order matters
+   * for the progressive card pool (ZoneScene.getAllCards), which must still
+   * start from zone_01.
+   *
+   * Deduplicated by id: re-registering a zone with the same id (e.g. a draft
+   * re-tested after edits) replaces the previous in-memory copy in place.
+   * The store is never written back to disk — reloads drop runtime zones.
+   *
+   * @param zone - Validated zone data (caller is responsible for validation)
+   */
+  registerRuntimeZone(zone: ZoneData): void {
+    const store = this._require();
+    if (store.zones.has(zone.id)) {
+      store.zones.set(zone.id, zone);
+      return;
+    }
+    store.zones.set(zone.id, zone);
+    store.zoneOrder.push(zone.id);
+  }
+
+  /**
    * Returns all timeline entries in authoring order.
    */
   getTimeline(): TimelineEntry[] {

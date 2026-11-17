@@ -128,6 +128,15 @@ export interface ZoneData {
    */
   npcs: string[];
 
+  /**
+   * Optional per-zone NPC position overrides (level editor, J6).
+   * npcs.json stores one global position per NPC; fan/editor zones place
+   * those same NPCs at their own coordinates. When an id is present here,
+   * ZoneScene spawns that NPC at the override position instead of the
+   * npcs.json one. Official zones never use this field.
+   */
+  npcPositions?: Record<string, { x: number; y: number }>;
+
   /** Door definitions for this zone. */
   doors: DoorData[];
 

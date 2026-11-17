@@ -4,6 +4,7 @@ import { NPC } from '@/entities/NPC';
 import { Door } from '@/entities/Door';
 import { ContentLoader } from '@/systems/ContentLoader';
 import { InteractionSystem } from '@/systems/InteractionSystem';
+import { MapBuilder } from '@/systems/MapBuilder';
 import { DeckSystem } from '@/systems/DeckSystem';
 import { ProgressionSystem } from '@/systems/ProgressionSystem';
 import { SaveSystem } from '@/systems/SaveSystem';
@@ -11,7 +12,7 @@ import { InputLock } from '@/systems/InputLock';
 import { GameEvents } from '@/systems/GameEvents';
 import { AudioManager } from '@/systems/AudioManager';
 import type { CardData } from '@/types/CardData';
-import type { ZoneData, ZoneTheme, ZoneProp } from '@/types/ZoneData';
+import type { ZoneData, ZoneTheme } from '@/types/ZoneData';
 
 /**
  * Default zone theme, used when a zone JSON predates the `theme` schema
@@ -118,6 +119,12 @@ export class ZoneScene extends Phaser.Scene {
   /** Whether the timeline frieze is currently open (to avoid double-toggle). */
   private timelineOpen = false;
 
+  /**
+   * Scene key to return to on Escape, when set via scene.start data.
+   * Undefined = standard main-menu exit. Set by EditorScene test plays (J6).
+   */
+  private returnTo?: string;
+
   /** Zone data loaded from ContentLoader for the active zone. */
   private zoneData!: ZoneData;
 
@@ -166,8 +173,12 @@ export class ZoneScene extends Phaser.Scene {
     // ---- Zone data ----
     // Accept zoneId from scene.start() data (multi-zone path).
     // Fall back to the first zone in the index on first launch.
-    const sceneData = this.scene.settings.data as { zoneId?: string } | undefined;
+    // returnTo (optional) — scene key to return to on Escape. Used by the
+    // level editor's test-play loop: Escape brings the user back to the
+    // editor instead of the main menu (J6).
+    const sceneData = this.scene.settings.data as { zoneId?: string; returnTo?: string } | undefined;
     const requestedId = sceneData?.zoneId;
+    this.returnTo = sceneData?.returnTo;
 
     let zone: ZoneData | undefined;
     if (requestedId) {
@@ -227,7 +238,20 @@ export class ZoneScene extends Phaser.Scene {
 
     // ---- Map (tilemap layers + props if `map` data present, else placeholder floor) ----
     // Built after the player exists so solid props/walls can collide with it immediately.
-    const { worldWidth, worldHeight } = this._buildMap(this.zoneData);
+    // Rendering itself lives in MapBuilder (shared with the level editor — J6).
+    let worldWidth: number;
+    let worldHeight: number;
+    if (this.zoneData.map) {
+      const built = MapBuilder.build(this, this.zoneData, this.player);
+      this.wallsLayer = built.wallsLayer;
+      worldWidth = built.worldWidth;
+      worldHeight = built.worldHeight;
+    } else {
+      const { width, height } = this.scale;
+      this._drawPlaceholderMap(width, height, this.zoneData.themeEra);
+      worldWidth = width * 2;
+      worldHeight = height * 2;
+    }
 
     // ---- Camera ----
     // Follow player with lerp ≈ 0.15 (matches Unity CameraFollow smoothTime=0.15)
@@ -282,10 +306,17 @@ export class ZoneScene extends Phaser.Scene {
     this.progression = new ProgressionSystem(this.game.events, questNPCCount, zoneQuestNpcIdSet);
 
     for (const npcId of questNPCIds) {
-      const npcData = cl.getNpc(npcId);
+      let npcData = cl.getNpc(npcId);
       if (!npcData) {
         console.warn(`ZoneScene: NPC "${npcId}" not found in npcs.json`);
         continue;
+      }
+
+      // Per-zone position override (editor/fan zones, J6): clone the npc data
+      // so the shared npcs.json object is never mutated.
+      const override = this.zoneData.npcPositions?.[npcId];
+      if (override) {
+        npcData = { ...npcData, position: { ...override } };
       }
 
       const npc = new NPC(this, npcData);
@@ -477,7 +508,12 @@ export class ZoneScene extends Phaser.Scene {
       this._unbindEvents();
       this.scene.stop('UIScene');
       this.scene.stop('TimelineScene');
-      this.scene.start('MainMenuScene');
+      // Editor test play: return to the editor, not the menu (J6).
+      if (this.returnTo === 'EditorScene') {
+        this.scene.start('EditorScene');
+      } else {
+        this.scene.start('MainMenuScene');
+      }
     });
   }
 
@@ -644,85 +680,6 @@ export class ZoneScene extends Phaser.Scene {
       // Depth above tiles/props/entities (all negative-to-mid depths), below UI (separate scene).
       ambientRect.setScrollFactor(0);
       ambientRect.setDepth(9000);
-    }
-  }
-
-  /**
-   * Build the zone's tilemap layers (ground/walls/decor) and props from
-   * `zone.map`, or fall back to the era-hashed placeholder checkerboard when
-   * the zone predates the `map` schema (content and engine work land in
-   * parallel — this keeps ZoneScene working with either).
-   *
-   * Layer render order (back to front): ground < walls < decor < entities
-   * (entities y-sort via depth = feet Y, always a much larger positive value).
-   *
-   * @param zone - Active zone data
-   * @returns World pixel dimensions to use for camera/physics bounds
-   */
-  private _buildMap(zone: ZoneData): { worldWidth: number; worldHeight: number } {
-    const map = zone.map;
-
-    if (!map) {
-      const { width, height } = this.scale;
-      this._drawPlaceholderMap(width, height, zone.themeEra);
-      return { worldWidth: width * 2, worldHeight: height * 2 };
-    }
-
-    const makeLayer = (data: number[][], depth: number, collides: boolean): Phaser.Tilemaps.TilemapLayer => {
-      const tilemap = this.make.tilemap({ data, tileWidth: map.tileSize, tileHeight: map.tileSize });
-      const tileset = tilemap.addTilesetImage('tiles', 'tiles', map.tileSize, map.tileSize)!;
-      const layer = tilemap.createLayer(0, tileset, 0, 0)!;
-      layer.setScale(map.tileScale).setDepth(depth);
-      if (collides) {
-        layer.setCollisionByExclusion([-1]);
-      }
-      return layer;
-    };
-
-    // ground renders below everything, never collides.
-    makeLayer(map.ground, -30, false);
-    // walls collide with the player; stored for the collider added once the player exists.
-    this.wallsLayer = makeLayer(map.walls, -20, true);
-    // decor renders above ground, below entities, never collides.
-    makeLayer(map.decor, -10, false);
-
-    for (const prop of map.props) {
-      // Props share the tileset's native pixel density → same display scale.
-      this._spawnProp(prop, map.tileScale);
-    }
-
-    return {
-      worldWidth: map.width * map.tileSize * map.tileScale,
-      worldHeight: map.height * map.tileSize * map.tileScale,
-    };
-  }
-
-  /**
-   * Spawn one prop from `zone.map.props`: registers a custom texture frame
-   * for its source rect in the props atlas, places it at ×2 display scale,
-   * y-sorts it like an entity (depth = feet Y), and gives it a static
-   * physics body + player collider when `solid` is true.
-   *
-   * @param prop  - Prop placement data (source rect + world position + solid flag)
-   * @param scale - Display scale (map.tileScale — props share the tileset pixel density)
-   */
-  private _spawnProp(prop: ZoneProp, scale: number): void {
-    const [rx, ry, rw, rh] = prop.rect;
-    const frameName = `prop_${rx}_${ry}_${rw}_${rh}`;
-
-    const propsTexture = this.textures.get('props_atlas');
-    if (!propsTexture.has(frameName)) {
-      propsTexture.add(frameName, 0, rx, ry, rw, rh);
-    }
-
-    const img = this.add.image(prop.x, prop.y, 'props_atlas', frameName);
-    img.setScale(scale);
-    // y-sort like entities: depth = feet Y (origin is centre, so bottom edge = y + half display height).
-    img.setDepth(prop.y + img.displayHeight / 2);
-
-    if (prop.solid) {
-      this.physics.add.existing(img, true);
-      this.physics.add.collider(this.player, img);
     }
   }
 
